@@ -1,0 +1,50 @@
+name: Extract HyperOS Boot and Vendor Bootv2
+
+on:
+  workflow_dispatch:
+    inputs:
+      rom_url:
+        description: 'Direct link to the HyperOS Recovery ZIP'
+        required: true
+        default: 'https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.208.0.VGQINXM/air_in_global-ota_full-OS2.0.208.0.VGQINXM-user-15.0-93391672cc.zip'
+
+jobs:
+  extract_and_release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+
+      - name: Download payload-dumper-go
+        run: |
+          wget -q https://github.com/ssut/payload-dumper-go/releases/download/1.2.2/payload-dumper-go_1.2.2_linux_amd64.tar.gz
+          tar -zxvf payload-dumper-go_1.2.2_linux_amd64.tar.gz payload-dumper-go
+          chmod +x payload-dumper-go
+
+      - name: Download HyperOS ROM
+        run: |
+          wget -q "${{ github.event.inputs.rom_url }}" -O rom.zip
+
+      - name: Extract payload.bin
+        run: |
+          unzip -q rom.zip payload.bin
+
+      - name: Dump Boot and Vendor Boot Partitions
+        run: |
+          ./payload-dumper-go -p boot,vendor_boot payload.bin
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: hyperos-imgs-${{ github.run_id }}
+          name: "HyperOS Boot & Vendor Boot Images"
+          body: "Automated extraction of the boot and vendor_boot partitions from HyperOS."
+          files: extracted_*/*.img
