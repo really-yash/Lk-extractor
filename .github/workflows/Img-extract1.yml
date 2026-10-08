@@ -53,19 +53,49 @@ jobs:
           mkdir -p workspace
           mv extracted_*/*.img workspace/
 
-      - name: Unpack vendor_boot.img and Decompile DTB
+      - name: Unpack vendor_boot.img and Split DTBs
         working-directory: workspace
         run: |
-          echo "Unpacking vendor_boot image to extract Device Tree..."
+          echo "Unpacking vendor_boot image..."
           magiskboot unpack vendor_boot.img
           
-          if [ -f "dtb" ]; then
-            echo "Device Tree Blob found. Decompiling to DTS..."
-            dtc -I dtb -O dts dtb -o decompiled_tree.dts
-          else
+          if [ ! -f "dtb" ]; then
             echo "No DTB found in vendor_boot.img!"
             exit 1
           fi
+          
+          echo "Splitting concatenated MediaTek DTBs..."
+          cat << 'EOF' > split_dtb.py
+          import sys
+          with open("dtb", "rb") as f:
+              data = f.read()
+          
+          magic = b'\xd0\x0d\xfe\xed'
+          start = data.find(magic)
+          
+          if start == -1:
+              print("No standard DTB magic number found.")
+              sys.exit(1)
+              
+          count = 0
+          while start != -1:
+              next_start = data.find(magic, start + 4)
+              end = next_start if next_start != -1 else len(data)
+              with open(f"split_{count}.dtb", "wb") as out:
+                  out.write(data[start:end])
+              start = next_start
+              count += 1
+          print(f"Extracted {count} raw DTBs.")
+          EOF
+          
+          python3 split_dtb.py
+          
+          echo "Decompiling extracted DTBs..."
+          for file in split_*.dtb; do
+            dtc -I dtb -O dts "$file" -o "${file}.dts" 2>/dev/null || true
+          done
+          
+          cat split_*.dts > decompiled_tree.dts 2>/dev/null || true
 
       - name: Extract kernel_phys_load (Physical Memory Base)
         working-directory: workspace
