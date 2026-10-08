@@ -30,9 +30,13 @@ jobs:
 
       - name: Download Magiskboot
         run: |
-          wget https://github.com/xiaolu/magiskboot/releases/download/20220914/magiskboot_x86_64
-          chmod +x magiskboot_x86_64
-          sudo mv magiskboot_x86_64 /usr/local/bin/magiskboot
+          echo "Downloading official Magisk APK..."
+          wget -O magisk.apk https://github.com/topjohnwu/Magisk/releases/download/v27.0/Magisk-v27.0.apk
+          echo "Extracting magiskboot binary from APK..."
+          unzip -j magisk.apk lib/x86_64/libmagiskboot.so -d .
+          mv libmagiskboot.so magiskboot
+          chmod +x magiskboot
+          sudo mv magiskboot /usr/local/bin/magiskboot
 
       - name: Download OTA ROM
         run: |
