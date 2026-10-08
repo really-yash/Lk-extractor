@@ -15,10 +15,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Dependencies (Go, Device Tree Compiler)
+      - name: Install Dependencies (Go, Device Tree Compiler, LZMA)
         run: |
           sudo apt-get update
-          sudo apt-get install -y device-tree-compiler wget unzip
+          sudo apt-get install -y device-tree-compiler wget unzip liblzma-dev
           
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -71,8 +71,6 @@ jobs:
           echo ""
           echo "Searching for DRAM base in memory nodes..."
           
-          # Grep the decompiled device tree for the main memory node
-          # MediaTek memory blocks typically start at 0x40000000, 0x80000000, or 0x0
           grep -A 3 "memory@" decompiled_tree.dts || true
           
           echo ""
