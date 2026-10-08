@@ -46,23 +46,24 @@ jobs:
       - name: Extract payload.bin
         run: unzip rom.zip payload.bin
 
-      - name: Dump boot.img
+      - name: Dump vendor_boot.img
         run: |
-          ~/go/bin/payload-dumper-go -p boot payload.bin
+          echo "Extracting vendor_boot partition..."
+          ~/go/bin/payload-dumper-go -p vendor_boot payload.bin
           mkdir -p workspace
           mv extracted_*/*.img workspace/
 
-      - name: Unpack boot.img and Decompile DTB
+      - name: Unpack vendor_boot.img and Decompile DTB
         working-directory: workspace
         run: |
-          echo "Unpacking boot image to extract Device Tree..."
-          magiskboot unpack boot.img
+          echo "Unpacking vendor_boot image to extract Device Tree..."
+          magiskboot unpack vendor_boot.img
           
           if [ -f "dtb" ]; then
             echo "Device Tree Blob found. Decompiling to DTS..."
             dtc -I dtb -O dts dtb -o decompiled_tree.dts
           else
-            echo "No DTB found in boot.img!"
+            echo "No DTB found in vendor_boot.img!"
             exit 1
           fi
 
