@@ -64,8 +64,41 @@ jobs:
             exit 1
           fi
           
-          echo "Using fdtdump to bypass MediaTek headers..."
-          fdtdump dtb > decompiled_tree.dts
+          echo "Safely slicing DTBs using precise header lengths..."
+          cat << 'EOF' > extract_dtb.py
+          import struct
+          
+          with open('dtb', 'rb') as f:
+              data = f.read()
+              
+          magic = b'\xd0\x0d\xfe\xed'
+          offset = 0
+          count = 0
+          
+          while True:
+              idx = data.find(magic, offset)
+              if idx == -1:
+                  break
+              # Read the exact file size declared in the FDT header
+              if idx + 8 <= len(data):
+                  totalsize = struct.unpack('>I', data[idx+4:idx+8])[0]
+                  if 0 < totalsize < 10485760: # Sanity check (must be <10MB)
+                      with open(f'split_{count}.dtb', 'wb') as out:
+                          out.write(data[idx:idx+totalsize])
+                      count += 1
+                      offset = idx + totalsize
+                      continue
+              offset = idx + 4
+          EOF
+          
+          python3 extract_dtb.py
+          
+          echo "Decompiling perfectly sliced DTBs..."
+          for file in split_*.dtb; do
+            dtc -I dtb -O dts "$file" -o "${file}.dts" 2>/dev/null || true
+          done
+          
+          cat split_*.dts > decompiled_tree.dts 2>/dev/null || true
           
           echo "======================================"
           echo "      EXTRACTED PHYSICAL OFFSETS      "
