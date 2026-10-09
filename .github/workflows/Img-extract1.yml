@@ -53,7 +53,7 @@ jobs:
           mkdir -p workspace
           mv extracted_*/*.img workspace/
 
-      - name: Unpack vendor_boot.img and Split DTBs
+      - name: Unpack vendor_boot and Extract Offsets
         working-directory: workspace
         run: |
           echo "Unpacking vendor_boot image..."
@@ -64,53 +64,14 @@ jobs:
             exit 1
           fi
           
-          echo "Splitting concatenated MediaTek DTBs..."
-          cat << 'EOF' > split_dtb.py
-          import sys
-          with open("dtb", "rb") as f:
-              data = f.read()
+          echo "Using fdtdump to bypass MediaTek headers..."
+          fdtdump dtb > decompiled_tree.dts
           
-          magic = b'\xd0\x0d\xfe\xed'
-          start = data.find(magic)
-          
-          if start == -1:
-              print("No standard DTB magic number found.")
-              sys.exit(1)
-              
-          count = 0
-          while start != -1:
-              next_start = data.find(magic, start + 4)
-              end = next_start if next_start != -1 else len(data)
-              with open(f"split_{count}.dtb", "wb") as out:
-                  out.write(data[start:end])
-              start = next_start
-              count += 1
-          print(f"Extracted {count} raw DTBs.")
-          EOF
-          
-          python3 split_dtb.py
-          
-          echo "Decompiling extracted DTBs..."
-          for file in split_*.dtb; do
-            dtc -I dtb -O dts "$file" -o "${file}.dts" 2>/dev/null || true
-          done
-          
-          cat split_*.dts > decompiled_tree.dts 2>/dev/null || true
-
-      - name: Extract kernel_phys_load (Physical Memory Base)
-        working-directory: workspace
-        run: |
           echo "======================================"
           echo "      EXTRACTED PHYSICAL OFFSETS      "
           echo "======================================"
-          echo ""
-          echo "Searching for DRAM base in memory nodes..."
-          
-          grep -A 3 "memory@" decompiled_tree.dts || true
-          
-          echo ""
-          echo "Check the 'reg = <...>' values above."
-          echo "The first hex value after the size (e.g., 0x40000000) is your kernel_phys_load."
+          echo "Searching for DRAM base..."
+          grep -A 3 "memory@" decompiled_tree.dts || echo "Memory node not found."
           echo "======================================"
           
       - name: Upload Decompiled DTS (Optional)
@@ -118,4 +79,3 @@ jobs:
         with:
           name: MTK-Device-Tree-Source
           path: workspace/decompiled_tree.dts
-          
